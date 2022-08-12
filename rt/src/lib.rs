@@ -1,4 +1,3 @@
-#![no_main]//告诉编译器不要使用main函数作为程序的入口，因为main对运行时有要求
 #![no_std]
 
 use core::panic::PanicInfo;
@@ -10,9 +9,12 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn Reset() -> ! {
-    let _x = 42;
     //永不退出的发散函数
-    loop {}
+    extern "Rust" {
+        fn main() -> !;
+    }
+
+    main()
 }
 //说明这个函数需要编译到名称为.vector_table.reset_vector的这个节中，这个节在后面会被引用到
 #[link_section = ".vector_table.reset_vector"]
