@@ -30,7 +30,7 @@
     * cargo-binutils：直接使用最新
     
 * QEMU模拟器
-    
+  
     采用7.0.0版本（[qemu-w64-setup-20220419.exe](https://qemu.weilnetz.de/w64/qemu-w64-setup-20220419.exe)）
     
 * gdb工具
@@ -53,7 +53,7 @@
 
 # 1 最小的`#![no_std]`程序
 
-> 本节完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/01-the-smallest-nostd-program](https://github.com/youth7/the-embedonomicon-note/tree/01-the-smallest-nostd-program)
+这个章节主要是写一个`#![no_std]`版的hello world程序，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/01-the-smallest-nostd-program](https://github.com/youth7/the-embedonomicon-note/tree/01-the-smallest-nostd-program)
 
 ## std和core
 
@@ -95,7 +95,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 
 依次使用以下2个命令将源码编译为目标文件，并查看其中的符号
 
-```bash
+```powershell
 # 编译代码，--target是cargo命令的参数,指定了编译产物的目标平台，详情参考cargo book
 # --emit指定了编译产物的文件类型，详情参考rustc book
 cargo rustc --target thumbv7m-none-eabi -- --emit=obj
@@ -106,20 +106,20 @@ rust-nm  target/thumbv7m-none-eabi/debug/deps/app-*.o
 
 此时的输出为
 
-```bash
+```powershell
 00000000 T rust_begin_unwind
 ```
 
 
 
 如果你安装了wsl2的话，可以用其它命令来查看符号，例如使用`readelf`来查看
-```bash
+```powershell
 readelf -s ./target/thumbv7m-none-eabi/debug/deps/*.o
 ```
 
 控制台输出：
 
-```bash
+```powershell
 Symbol table '.symtab' contains 10 entries:
    Num:    Value  Size Type    Bind   Vis      Ndx Name
      0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
@@ -136,13 +136,13 @@ Symbol table '.symtab' contains 10 entries:
 
 或者使用`nm`来查看
 
-```bash
+```powershell
 nm ./target/thumbv7m-none-eabi/debug/deps/*.o
 ```
 
 控制台输出：
 
-```bash
+```powershell
 00000000 t $t.0
 00000001 T rust_begin_unwind
 ```
@@ -172,7 +172,7 @@ nm ./target/thumbv7m-none-eabi/debug/deps/*.o
 
 # 2 内存布局
 
-> 本章节完整代码见[https://github.com/youth7/the-embedonomicon-note/tree/02-memory-layout](https://github.com/youth7/the-embedonomicon-note/tree/02-memory-layout)
+这个章节主要是介绍如何通过各种工具来调整内存布局，使得生成的二进制程序能够在裸机上运行，并通过gdb来验证生成的程序是否正确，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/02-memory-layout](https://github.com/youth7/the-embedonomicon-note/tree/02-memory-layout)
 
 这一章主要是讲如何生成正确结构的二进制文件，使其能够在特定架构的CPU上运行。要实现这个目标就必须：
 
@@ -295,9 +295,7 @@ SECTIONS
 
 链接器会从entry指定的函数开始，从目标文件中递归搜索所有用到的符号，一旦所有符合解析完成了就停止，即使此时还有目标文件未被搜索。`EXTERN`的作用是强制链接器去继续解析被`EXTERN`作为参数的符号，例如本节中的`RESET_VECTOR`。
 
-一开始不太明白为何要多用一个变量`RESET_VECTOR`而不是直接使用`Reset`函数，后来发现Reset函数是被编译到`.text`节中的，
-
-这样后续要继续引用`Reset`的地址会比较麻烦，用`RESET_VECTOR`来保存`Reset`的地址并放到`.vector_table.reset_vecto`r中有利于在链接脚本中引用该地址
+一开始不太明白为何要多用一个变量`RESET_VECTOR`而不是直接使用`Reset`函数，后来发现Reset函数是被编译到`.text`节中的。这使得后续要继续引用`Reset`的地址会比较麻烦，用`RESET_VECTOR`来保存`Reset`的地址并放到`.vector_table.reset_vecto`r中有利于在链接脚本中引用该地址
 
 ### [SECTIONS](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html#SEC17)
 
@@ -326,14 +324,14 @@ target = "thumbv7m-none-eabi"
 
 先使用`cargo build --bin app`编译项目。成功后使用以下命令来检查结果是否符合预期
 
-```bash
+```powershell
 # 使用rust-objdump去检查最终生成的可执行文件中的汇编代码
 rust-objdump -d --no-show-raw-insn .\target\thumbv7m-none-eabi\debug\app
 ```
 
 此时输出为：
 
-```bash
+```powershell
 .\target\thumbv7m-none-eabi\debug\app:  file format elf32-littlearm
 
 Disassembly of section .text:
@@ -350,14 +348,14 @@ Disassembly of section .text:
 
 保险起见我们还需要检查一下vector table，使用以下命令：
 
-```bash
+```powershell
 # 使用rust-objdump去检查最终生成的可执行文件中指定节的具体内容
 rust-objdump -s --section .vector_table .\target\thumbv7m-none-eabi\debug\app
 ```
 
 此时的输出为
 
-```bash
+```powershell
 .\target\thumbv7m-none-eabi\debug\app:  file format elf32-littlearm
 Contents of section .vector_table:
  0000 00000120 09000000                    ... ....
@@ -403,16 +401,337 @@ $2 = 42
 (gdb) print &_x				#打印变量_x的地址
 $3 = (*mut i32) 0x2000fffc
 (gdb) quit					#退出
-
 ```
 
 
 
+# 3 `main`接口
+
+本章节主要介绍了如何将上一章节的成果从binary package转化为lib package，以便其他开发者可以使用它来开发自己的应用程序。这样相当于建立了一个抽象层，屏蔽了裸机相关的内容，开发者只需编写自己的`main`程序即可。本章难点在于理解为何需要初始化内存，以及如何初始化内存，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/03-main-interface](https://github.com/youth7/the-embedonomicon-note/tree/03-main-interface)
+
+为了达到这个目标，我们需要将之前的项目改为lib package（名为rt，即runtime的意思），然后再新建一个binary package（名为app），然后在`app`中引用`rt`。
+
+## 将原项目改造名为`rt`的lib package
+
+首先将之前类型为binary的package改为lib类型，这需要：
+
+* `main.rs`重命名为`lib.rs`
+
+* 把`Cargo.toml`中`[package]`的`name`改为`rt`，同时将项目根目录重命名为`rt`
+
+  ```toml
+  [package]
+  name = "rt" #修改这里
+  version = "0.1.0"
+  edition = "2021"
+  ```
+
+
+* 改写`Reset`函数，让它去调用用户编写的`main`函数，注意这里只列出了改写的部分
+
+  ```rust
+  #![no_std]
+  
+  use core::panic::PanicInfo;
+  
+  // CHANGED!
+  #[no_mangle]
+  pub unsafe extern "C" fn Reset() -> ! {
+      extern "Rust" {
+          fn main() -> !;//将控制权交给用户的main函数，因此main必须是发散的
+      }
+  
+      main()
+  }
+  ```
+
+* 在根目录创建`build.rs`，这是非常关键的一步，原理是通过Rust提供的[构建脚本](https://doc.rust-lang.org/stable/cargo/reference/build-scripts.html#build-scripts)来调整一些编译时的行为，请看考代码中的注释
+
+  ```rust
+  use std::{env, error::Error, fs::File, io::Write, path::PathBuf};
+  
+  fn main() -> Result<(), Box<dyn Error>> {
+      //从环境变量OUT_DIR中读取一个路径，用于存放构建过程的一些中间产物
+      let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+  
+      //这是最重要的一步了，通过特定的指令告诉编译器从哪个路径搜索链接脚本
+      println!("cargo:rustc-link-search={}", out_dir.display());
+  
+      // 将链接脚本复制到上一步指定的路径
+      // 如果在上一步中将链接脚本的搜索路径设置为库的根目录，则这一步可以省略
+      File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link.x"))?;
+  
+      Ok(())
+  }
+  ```
+  
+
+ 注：当在`rt`下修改`build.rs`时会触发自动编译，此时`OUT_DIR`指向`rt/target`下的子目录；而编译`app`时`OUT_DIR`则指向`app/target`下的子目录，这意味着`link.x`会被复制到项目`app`中。
 
 
 
+## 使用`rt`编写应用程序
 
-# `main`接口
+创建一个binary package
+
+```powershell
+cargo new --bin app
+```
+
+修改`cargo.toml`，引入`rt`作为依赖
+
+```toml
+[dependencies]
+rt = { path = "../rt" }
+```
+
+将`rt`中`.cargo`文件夹复制到`app`的根目录，使用和`rt`一样的cargo配置编译。
+
+最后编写自己的`main.rs`
+
+```rust
+#![no_std]
+#![no_main]
+
+extern crate rt;
+
+#[no_mangle]
+pub fn main() -> ! {
+    let _x = 42;
+
+    loop {}
+}
+```
+
+然后编译并检查二进制文件
+
+```powershell
+cargo build --bin app # 编译
+rust-objdump   -d --no-show-raw-insn .\target\thumbv7m-none-eabi\debug\app # 显示汇编代码
+```
+
+会有如下输出，可以看到`Reset`已经被链接进来并调用了`main`函数
+
+```powershell
+.\target\thumbv7m-none-eabi\debug\app:  file format elf32-littlearm
+
+Disassembly of section .text:
+
+00000008 <main>:
+       8:       sub     sp, #4
+       a:       movs    r0, #42
+       c:       str     r0, [sp]
+       e:       b       0x10 <main+0x8>         @ imm = #-2
+      10:       b       0x10 <main+0x8>         @ imm = #-4
+
+00000012 <Reset>:
+      12:       push    {r7, lr}
+      14:       mov     r7, sp
+      16:       bl      0x8 <main>              @ imm = #-18
+      1a:       trap
+```
+
+
+
+注：其实`app`的`.cargo/config`里面的`rustflags`配置项声明了需要了`link.x`，说明`app`对`rt`还是有些显式依赖的，不知道后续有无办法能够移除这个配置项，使得`app`无需知道`rt`中的任何内容。
+
+
+
+## 将`rt`改造为类型安全
+
+用户虽然可以编写自己的`main`函数，但如果`main`不符合`rt`的要求，例如用户不小心把`main`编写为一个非发散的函数，此时编译不会报错但运行时会有不可预知的错误。
+
+>  个人认为虽然`rt`中声明了`main`的类型是发散函数，但给`rt`提供`main`是链接器行为而不是编译器行为，链接器不会去管语言级别的一些细节，因此不会有链接错误。而编译时rt`和`app`之间没有代码层面的依赖，因此也不会察觉类型不匹配的问题。
+
+可以在`rt`的`lib.rs`中定义并暴露一个宏给`app`调用，通过宏来做类型检查以消除上述隐患。
+
+```rust
+#[macro_export]
+macro_rules! entry {
+    ($path:path) => {
+        #[export_name = "main"]//__main导出为main，则rt中最终链接的是当前文件内的main函数，而不是用户的main函数
+        pub unsafe fn __main() -> ! {
+            // $path就是用户传入的函数，对它进行类型检验后调用，此时用户写的函数的名称可以自定义了，不一定就是要用main
+            let f: fn() -> ! = $path;
+
+            f()
+        }
+    }
+}
+```
+
+然后修改`app`中的`main.rs`
+
+```rust
+#![no_std]
+#![no_main]
+
+use rt::entry;
+//使用rt中暴露出来的宏来调用用户编写的函数，此时用户编写的函数可以用其它名称
+//其实这样做增加了一些复杂性，之前的方法用户只需要编写一个main函数就可以了，其它什么不用管
+//而现在则需要了解entry宏
+entry!(main2);
+
+fn main2() -> ! {
+    let _x = 42;
+
+    loop {}
+}
+```
+
+
+
+## 在`main`运行之前初始化内存（难点）
+
+`rt`现在已经比较完整了，但是功能上还是有一些缺失，比如用户不能在自己的代码中使用静态变量和字符串，因为编译器会将这些内容生成到`.bss`、`.data`、`.rodata`节中，但我们的链接脚本中抛弃了这些节。为此我们需要修改一下链接脚本：
+
+```link
+  /DISCARD/ :
+  {
+    *(.ARM.exidx .ARM.exidx.*);
+  }
+
+  /* 新增三个用于保存数据的section */
+  .rodata :
+  {
+    *(.rodata .rodata.*);
+  } > FLASH
+
+  .bss :
+  {
+    *(.bss .bss.*);
+  } > RAM
+
+  .data :
+  {
+    *(.data .data.*);
+  } > RAM
+```
+
+这样就能在代码中使用这些变量了
+
+```rust
+#![no_std]
+#![no_main]
+
+use rt::entry;
+//使用rt中暴露出来的宏来调用用户编写的函数，此时用户编写的函数可以用其它名称，例如这里就用了main2
+//其实这样做增加了一些复杂性，之前的方法用户只需要编写一个main函数就可以了，其它什么不用管
+//而现在则需要了解entry宏
+entry!(main2);
+static RODATA: &[u8] = b"Hello, world!";
+static mut BSS: u8 = 0;
+static mut DATA: u16 = 1;
+fn main2() -> ! {
+    let _x = RODATA;
+    let _y = unsafe { &BSS };
+    let _z = unsafe { &DATA };
+
+    loop {}
+}
+```
+
+如果在真机上调试这段代码，你会发现`BSS`和`DATA`的值并非预期中的0和1，这是因为真机启动后内存中的值是随机导致的。但在Qemu上你无法重现这个问题，因为Qemu已经帮你初始化了。
+
+关于真机内存中的值是随机这个问题需要这样认识：
+
+* 编译和链接时会确定一些信息并将它们记录到ELF中，这些信息包括：
+  * 变量`BSS`和`DATA`的值（它们分别属于节`.bss`和`.data`）
+  * 节`.bss`和`.data`的LMA、VMA值（理解LMA和VMA非常重要，可以参考[这里](https://github.com/cisen/blog/issues/887)和[这里](https://blog.csdn.net/eydwyz/article/details/124179377)）
+* ELF会被加载（烧录）到ROM里面，但运行时却在RAM里面。（例如链接脚本里面就把`.bss`和`.data`分配到RAM中，**因此相关变量的地址是指向RAM的**，而此时RAM里面的内容尚未被初始化，直接读取的话会读到脏数据）
+* 因为第2条的原因，需要在运行前**将ROM里面的相关数据复制到RAM中**
+
+上述的核心思想是，**编译和链接器为了保持程序能够正常执行，对程序和运行环境作出了一些约定，这些约定被记录在ELF文件中。加载器或者OS必须保证程序运行时这些约定都得以满足**。而对于本教程，Qemu负责将ELF加载到ROM，`lib.rs`中的代码负责初始化RAM并将ROM内的部分数据加载到RAM。
+
+（以上论述仅针对裸机编程，对于现代常用的通用操作系统来说，因为OS已经帮你将虚拟内存设置好了，程序面向的是一个理想的环境：VMA和LMA相等，因此无需关注上述的一些细节了。）
+
+为此我们在使用内存先需要先初始化，首先修改`link.x`，这相当于将一些约定信息写入到ELF中
+
+```link
+  /* 新增三个用于保存数据的section */
+  .rodata :
+  {
+    *(.rodata .rodata.*);
+  } > FLASH
+
+  .bss :
+  {
+    _sbss = .; /* 将.bss的起始地址保存到_sbss中 */
+    *(.bss .bss.*);
+    _ebss = .;/* 将.bss的结束地址保存到_ebss中 */
+  } > RAM
+
+  .data : AT(ADDR(.rodata) + SIZEOF(.rodata))  /*指定.data的LMA，紧贴着.rodata*/
+  {
+    _sdata = .;/* 将.data的起始地址保存到_sdata中 */
+    *(.data .data.*);
+    _edata = .;/* 将.data的结束地址保存到_edata中 */
+  } > RAM
+
+  _sidata = LOADADDR(.data);/*将.data的LMA与某个符号关联起来*/
+```
+
+然后修改`lib.rs`，增加对RAM进行初始化的代码
+
+```rust
+    // 为何这里需要extern块修饰呢？
+    extern "C" {
+        static mut _sbss: u8;
+        static mut _ebss: u8;
+
+        static mut _sdata: u8;
+        static mut _edata: u8;
+        static _sidata: u8;
+    }
+
+    //初始化.bss只需要将对应区域全部置为0即可
+    let count = &_ebss as *const u8 as usize - &_sbss as *const u8 as usize;
+    ptr::write_bytes(&mut _sbss as *mut u8, 0, count);
+
+    //初始化.data则需要从ROM复制
+    let count = &_edata as *const u8 as usize - &_sdata as *const u8 as usize;
+    ptr::copy_nonoverlapping(&_sidata as *const u8, &mut _sdata as *mut u8, count);
+```
+
+
+
+最后编译并检查一下结果是否符合预期
+
+```powershell
+cargo build --bin app
+rust-readobj .\target\thumbv7m-none-eabi\debug\app --program-headers --elf-output-style=GNU
+```
+
+输出如下：
+
+```powershell
+Elf file type is EXEC (Executable file)
+Entry point 0x51
+There are 6 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x010000 0x00000000 0x00000000 0x00008 0x00008 R   0x10000
+  LOAD           0x010008 0x00000008 0x00000008 0x0038c 0x0038c R E 0x10000
+  LOAD           0x0103a0 0x000003a0 0x000003a0 0x00094 0x00094 R   0x10000
+  LOAD           0x020000 0x20000000 0x20000000 0x00000 0x00001 RW  0x10000
+  LOAD           0x020002 0x20000002 0x00000434 0x00002 0x00002 RW  0x10000
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x0
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .vector_table
+   01     .text
+   02     .rodata
+   03     .bss
+   04     .data
+   05
+   None   .debug_abbrev .debug_info .debug_aranges .debug_ranges .debug_str .debug_pubnames .debug_pubtypes .ARM.attributes .debug_frame .debug_line .comment .symtab .shstrtab .strtab
+```
+
+可以看到`.data`的LMA和VMA是不一样，这是因为我们在`link.x`中通过`AT`命令对`.data`的LMA进行了调整
+
+
 
 # 异常处理
 
