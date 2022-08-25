@@ -26,18 +26,19 @@
 因为本文是基于win10的，所以只介绍win10下相关工具的安装过程
 
 * Rust相关
-    * Rust编译器：原书采用1.31，本文采用1.60.0
-    * cargo-binutils：直接使用最新
-    
+
+  * Rust编译器：原书采用1.31，本文采用1.60.0
+  * cargo-binutils：直接使用最新
+
 * QEMU模拟器
-  
-    采用7.0.0版本（[qemu-w64-setup-20220419.exe](https://qemu.weilnetz.de/w64/qemu-w64-setup-20220419.exe)）
-    
+
+  采用7.0.0版本（[qemu-w64-setup-20220419.exe](https://qemu.weilnetz.de/w64/qemu-w64-setup-20220419.exe)）
+
 * gdb工具
 
-    使用[gcc-arm-none-eabi-10.3-2021.10-win32](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-win32.exe)或[arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi](https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/11.3.rel1/binrel/arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi.exe)。
-    
-    >  注意不要使用gcc-arm-11.2-2022.02-mingw-w64-i686-arm-none-eabi，这个版本依赖过期的32位python2.7，在Win10上很难准备相关的运行环境给它，相关讨论见[这里](https://community.arm.com/support-forums/f/compilers-and-libraries-forum/52585/python-2-7-dependency-for-arm-none-eabi-gdb-at-windows-hosts)
+  使用[gcc-arm-none-eabi-10.3-2021.10-win32](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-win32.exe)或[arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi](https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/11.3.rel1/binrel/arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi.exe)。
+
+  >  注意不要使用gcc-arm-11.2-2022.02-mingw-w64-i686-arm-none-eabi，这个版本依赖过期的32位python2.7，在Win10上很难准备相关的运行环境给它，相关讨论见[这里](https://community.arm.com/support-forums/f/compilers-and-libraries-forum/52585/python-2-7-dependency-for-arm-none-eabi-gdb-at-windows-hosts)
 
 ## 和原教程的一些差异
 
@@ -113,6 +114,7 @@ rust-nm  target/thumbv7m-none-eabi/debug/deps/app-*.o
 
 
 如果你安装了wsl2的话，可以用其它命令来查看符号，例如使用`readelf`来查看
+
 ```powershell
 readelf -s ./target/thumbv7m-none-eabi/debug/deps/*.o
 ```
@@ -291,11 +293,21 @@ SECTIONS
 
 而`Reset`就是在系统重置时运行的第一个函数，因此指定它为入口也是合理的。
 
-### EXTERN
+### [EXTERN](https://sourceware.org/binutils/docs/ld/Miscellaneous-Commands.html)
 
-链接器会从entry指定的函数开始，从目标文件中递归搜索所有用到的符号，一旦所有符合解析完成了就停止，即使此时还有目标文件未被搜索。`EXTERN`的作用是强制链接器去继续解析被`EXTERN`作为参数的符号，例如本节中的`RESET_VECTOR`。
+链接器会从`entry`命令指定的函数开始，从目标文件中递归搜索所有用到的符号，一旦所有符合解析完成了就停止，即使此时还有目标文件未被搜索。`EXTERN`的作用是强制链接器去继续解析被`EXTERN`作为参数的符号，例如本节中的`RESET_VECTOR`。
 
-一开始不太明白为何要多用一个变量`RESET_VECTOR`而不是直接使用`Reset`函数，后来发现Reset函数是被编译到`.text`节中的。这使得后续要继续引用`Reset`的地址会比较麻烦，用`RESET_VECTOR`来保存`Reset`的地址并放到`.vector_table.reset_vecto`r中有利于在链接脚本中引用该地址
+其实不太明白为何要多用一个变量`RESET_VECTOR`而不是直接使用`Reset`这个符号，`Reset`已经包含了足够的信息用来填充vector table（ 在下一小结我们会通过检查符号表来印证这个结论），唯一的可能性是使用`RESET_VECTOR`会使得链接脚本更加容易编写？
+
+
+
+注意：文中关于`EXTERN`的目的和文档中的记录在**字面上**不是完全一致，这里先记录几个关键点：
+
+* ELF中undefined symbol的相关知识，可以参考[这里](https://docs.oracle.com/cd/E19120-01/open.solaris/819-0690/chapter2-9/index.html)。
+
+* 文档说`EXTERN`与`-u`等价，`-u`中有这么一句：If this option is being used to force additional modules to be pulled into the link，这可能就是文章中使用`EXTERN的目的`
+
+
 
 ### [SECTIONS](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html#SEC17)
 
@@ -363,7 +375,55 @@ Contents of section .vector_table:
 
 vector table第1个元素是的值由`LONG(ORIGIN(RAM) + LENGTH(RAM))`决定，这个表达式的值为0x20000000 + 64*1024 = 0x20010000，二进制表示为`00100000_00000001_00000000_00000000`。将这个二进制按照小端法读取出来就是0x00000120（这是objump的行为）。
 
-第2个元素的值是0x09000000，但是从上面我们可以知道`Reset`函数其实位于0x00000008。其实这是ARM cpu的规范，用函数地址的最低位的奇偶性来表示当前处于哪种模式，具体可以看[这里](https://stackoverflow.com/questions/37004954/function-address-in-arm-assembly-have-one-byte-offset)
+第2个元素的值是0x09000000，但是从上面我们可以知道`Reset`函数其实位于0x00000008。其实这是ARM cpu的规范，用函数地址的最低位的奇偶性来表示当前处于哪种模式，具体可以看[这里](https://stackoverflow.com/questions/37004954/function-address-in-arm-assembly-have-one-byte-offset)（记住这个讨论，下面会继续用到）
+
+### 检查`RESET_VECTOR`和`Reset`
+
+再用命令`rust-readobj.exe .\target\thumbv7m-none-eabi\debug\app -s -S --elf-output-style=GNU`检查一下符号表和section header:
+
+```powershell
+There are 17 section headers, starting at offset 0x111fc:
+
+Section Headers:
+  [Nr] Name              Type            Address  Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+  [ 1] .vector_table     PROGBITS        00000000 010000 000008 00   A  0   0  4
+  [ 2] .text             PROGBITS        00000008 010008 00000a 00  AX  0   0  2
+  [ 3] .debug_abbrev     PROGBITS        00000000 010012 00013c 00      0   0  1
+  [ 4] .debug_info       PROGBITS        00000000 01014e 00058e 00      0   0  1
+  [ 5] .debug_aranges    PROGBITS        00000000 0106dc 000030 00      0   0  1
+  [ 6] .debug_ranges     PROGBITS        00000000 01070c 000018 00      0   0  1
+  [ 7] .debug_str        PROGBITS        00000000 010724 00048c 01  MS  0   0  1
+  [ 8] .debug_pubnames   PROGBITS        00000000 010bb0 0000c9 00      0   0  1
+  [ 9] .debug_pubtypes   PROGBITS        00000000 010c79 00036b 00      0   0  1
+  [10] .ARM.attributes   ARM_ATTRIBUTES  00000000 010fe4 000032 00      0   0  1
+  [11] .debug_frame      PROGBITS        00000000 011018 00003c 00      0   0  4
+  [12] .debug_line       PROGBITS        00000000 011054 000054 00      0   0  1
+  [13] .comment          PROGBITS        00000000 0110a8 000013 01  MS  0   0  1
+  [14] .symtab           SYMTAB          00000000 0110bc 000050 10     16   3  4
+  [15] .shstrtab         STRTAB          00000000 01110c 0000c3 00      0   0  1
+  [16] .strtab           STRTAB          00000000 0111cf 00002a 00      0   0  1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+  L (link order), O (extra OS processing required), G (group), T (TLS),
+  C (compressed), x (unknown), o (OS specific), E (exclude),
+  R (retain), y (purecode), p (processor specific)
+
+Symbol table '.symtab' contains 5 entries:
+   Num:    Value  Size Type    Bind   Vis       Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT   UND
+     1: 00000000     0 FILE    LOCAL  DEFAULT   ABS 11xi6ura3lrymj6b
+     2: 00000008     0 NOTYPE  LOCAL  DEFAULT     2 $t.1
+     3: 00000004     4 OBJECT  GLOBAL DEFAULT     1 RESET_VECTOR
+     4: 00000009    10 FUNC    GLOBAL DEFAULT     2 Reset
+```
+
+从上可知：
+
+* `Reset`位于`.text`，其value和size分别是9和10，表示了这个函数在`.text`中的偏移量和大小（注意偏移量9和我们前面讨论的地址0x09000000是一致的）
+* `RESET_VECTOR`位于`.vector_table`，其value和size分别是4和4，表示了这个函数在`.text`中的偏移量和大小，具体的值还需要进一步读取。
+
+
 
 
 
@@ -410,6 +470,8 @@ $3 = (*mut i32) 0x2000fffc
 本章节主要介绍了如何将上一章节的成果从binary package转化为lib package，以便其他开发者可以使用它来开发自己的应用程序。这样相当于建立了一个抽象层，屏蔽了裸机相关的内容，开发者只需编写自己的`main`程序即可。本章难点在于理解为何需要初始化内存，以及如何初始化内存，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/03-main-interface](https://github.com/youth7/the-embedonomicon-note/tree/03-main-interface)
 
 为了达到这个目标，我们需要将之前的项目改为lib package（名为rt，即runtime的意思），然后再新建一个binary package（名为app），然后在`app`中引用`rt`。
+
+> 关于package和crate的对比可以看[这里](https://stackoverflow.com/questions/68250956/what-is-the-exact-difference-between-a-crate-and-a-package)
 
 ## 将原项目改造名为`rt`的lib package
 
@@ -464,7 +526,6 @@ $3 = (*mut i32) 0x2000fffc
       Ok(())
   }
   ```
-  
 
  注：当在`rt`下修改`build.rs`时会触发自动编译，此时`OUT_DIR`指向`rt/target`下的子目录；而编译`app`时`OUT_DIR`则指向`app/target`下的子目录，这意味着`link.x`会被复制到项目`app`中。
 
@@ -734,6 +795,14 @@ Program Headers:
 
 
 # 异常处理
+
+这一节是通过完善vector table，为`rt`增加更多的中断处理程序
+
+
+
+
+
+
 
 # 使用旧式方法写汇编
 
