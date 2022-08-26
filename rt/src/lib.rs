@@ -58,3 +58,47 @@ macro_rules! entry {
         }
     }
 }
+
+
+pub union Vector {
+    // 一个Vector就是vector table中的一项，根据arm的文档，每一项要么是一个异常处理函数，要么是预留（值为0）
+    reserved: u32,
+    handler: unsafe extern "C" fn(),
+}
+
+extern "C" {
+    //声明会用到的外部函数，因为有可能是用户提供的所以必须用extern，不明白为何是C规范而不是Rust规范，
+    //注意这里只是声明并没有提供具体实现，实现有两种，一种是使用默认的DefaultExceptionHandler；一种是用户提供
+    fn NMI();
+    fn HardFault();
+    fn MemManage();
+    fn BusFault();
+    fn UsageFault();
+    fn SVCall();
+    fn PendSV();
+    fn SysTick();
+}
+
+#[link_section = ".vector_table.exceptions"]// 将异常处理函数保存到节.vector_table.exceptions中
+#[no_mangle]
+pub static EXCEPTIONS: [Vector; 14] = [//定义vector table中剩余的14项
+    Vector { handler: NMI },
+    Vector { handler: HardFault },
+    Vector { handler: MemManage },
+    Vector { handler: BusFault },
+    Vector { handler: UsageFault},
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { handler: SVCall },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { handler: PendSV },
+    Vector { handler: SysTick },
+];
+
+#[no_mangle]
+pub extern "C" fn DefaultExceptionHandler() {// 定义一个默认的异常处理函数
+    loop {}
+}

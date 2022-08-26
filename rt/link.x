@@ -10,17 +10,30 @@ MEMORY
 ENTRY(Reset);
 
 EXTERN(RESET_VECTOR);
+EXTERN(EXCEPTIONS); 
 
 SECTIONS
 {
   .vector_table ORIGIN(FLASH) :
   {
-    /* First entry: initial Stack Pointer value */
+    /* vector table第一项：ISP */
     LONG(ORIGIN(RAM) + LENGTH(RAM));
 
-    /* Second entry: reset vector */
+    /* vector table第二项 */
     KEEP(*(.vector_table.reset_vector));
+
+    KEEP(*(.vector_table.exceptions)); /* 将剩余的14个异常处理函数保存到flash中，加上上面已有的两项刚好16项 */
   } > FLASH
+
+  /* 为符号提供默认值，只有当用户未提供自定义的异常处理程序时候才会生效，注意被提供默认值的项都是在lib.rs中声明过的外部函数 */
+  PROVIDE(NMI = DefaultExceptionHandler);
+  PROVIDE(HardFault = DefaultExceptionHandler);
+  PROVIDE(MemManage = DefaultExceptionHandler);
+  PROVIDE(BusFault = DefaultExceptionHandler);
+  PROVIDE(UsageFault = DefaultExceptionHandler);
+  PROVIDE(SVCall = DefaultExceptionHandler);
+  PROVIDE(PendSV = DefaultExceptionHandler);
+  PROVIDE(SysTick = DefaultExceptionHandler);
 
   .text :
   {
@@ -53,4 +66,6 @@ SECTIONS
   } > RAM
 
   _sidata = LOADADDR(.data);/*将.data的LMA与某个符号关联起来*/
+
+
 }
