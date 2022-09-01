@@ -1,7 +1,7 @@
 #![no_std]
 
+use core::arch::asm;
 use core::panic::PanicInfo;
-use core::ptr;
 
 #[panic_handler]//自定义程序奔溃时的行为，因为缺乏运行时的原因这个必须自己定义
 fn panic(_panic: &PanicInfo<'_>) -> ! {
@@ -11,23 +11,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 #[no_mangle]
 pub unsafe extern "C" fn Reset() -> ! {
 
-    // 为何这里需要extern块修饰呢？
-    extern "C" {
-        static mut _sbss: u8;
-        static mut _ebss: u8;
-
-        static mut _sdata: u8;
-        static mut _edata: u8;
-        static _sidata: u8;
-    }
-
-    //初始化.bss只需要将对应区域全部置为0即可
-    let count = &_ebss as *const u8 as usize - &_sbss as *const u8 as usize;
-    ptr::write_bytes(&mut _sbss as *mut u8, 0, count);
-
-    //初始化.data则需要从ROM复制
-    let count = &_edata as *const u8 as usize - &_sdata as *const u8 as usize;
-    ptr::copy_nonoverlapping(&_sidata as *const u8, &mut _sdata as *mut u8, count);
+    //为简化程序这里删除了栈初始化的代码
 
 
     extern "Rust" {
@@ -67,10 +51,8 @@ pub union Vector {
 }
 
 extern "C" {
-    //声明会用到的外部函数，因为有可能是用户提供的所以必须用extern，不明白为何是C规范而不是Rust规范，
-    //注意这里只是声明并没有提供具体实现，实现有两种，一种是使用默认的DefaultExceptionHandler；一种是用户提供
     fn NMI();
-    fn HardFault();
+    // fn HardFault();删除对HardFault的声明，因为不需要在rust代码中调用它
     fn MemManage();
     fn BusFault();
     fn UsageFault();
@@ -83,7 +65,7 @@ extern "C" {
 #[no_mangle]
 pub static EXCEPTIONS: [Vector; 14] = [//定义vector table中剩余的14项
     Vector { handler: NMI },
-    Vector { handler: HardFault },
+    Vector { handler: HardFaultTrampoline },// 改为使用辅助函数，通过它去调用HardFault
     Vector { handler: MemManage },
     Vector { handler: BusFault },
     Vector { handler: UsageFault},
@@ -98,7 +80,19 @@ pub static EXCEPTIONS: [Vector; 14] = [//定义vector table中剩余的14项
     Vector { handler: SysTick },
 ];
 
+#[allow(non_snake_case)]
 #[no_mangle]
-pub extern "C" fn DefaultExceptionHandler() {// 定义一个默认的异常处理函数
+pub fn DefaultExceptionHandler(_ef: *const u32) -> ! {//因为HardFaultTrampoline会传递参数，因此函数签名也要同步修改
     loop {}
+}
+
+
+#[no_mangle]
+extern "C" fn HardFaultTrampoline() {
+    unsafe{
+        asm!(
+          "mrs r0, MSP",
+          "b HardFault"
+        )
+    }
 }

@@ -13,8 +13,9 @@ fn main2() -> ! {
     intrinsics::abort()
 }
 
+//自定义异常处理函数，用QEMU调试时候应该停留在这里
 #[no_mangle]
-pub extern "C" fn HardFault() -> ! {
-    //自定义异常处理函数，用QEMU调试时候应该停留在这里
+#[allow(non_snake_case)]
+pub fn HardFault(_ef: *const u32) -> ! {//因为HardFaultTrampoline会传递参数，因此函数签名也要同步修改
     loop {}
 }
