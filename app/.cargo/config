@@ -1,7 +1,7 @@
 # 针对这个target使用链接脚本
 [target.thumbv7m-none-eabi]
 rustflags = ["-C", "link-arg=-Tlink.x"]
-
+runner = "qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel"
 # 指定编译的target，修改这里之后就无需在命令行传递--target参数了
 [build]
 target = "thumbv7m-none-eabi"

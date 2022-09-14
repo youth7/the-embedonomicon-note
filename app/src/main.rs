@@ -1,21 +1,29 @@
-#![no_std]
 #![no_main]
-#![feature(core_intrinsics)]// 因为使用了core_intrinsics的原因，必须切换到nightly来构建
+#![no_std]
 
-use core::intrinsics;
+use core::fmt::Write;
+//使用semihosting技术进行输出，因为QEMU直接支持semihosting。而在真机环境则可能需要用到串口等技术
+use cortex_m_semihosting::{debug, hio};
+
 use rt::entry;
-//使用rt中暴露出来的宏来调用用户编写的函数，此时用户编写的函数可以用其它名称，例如这里就用了main2
-//其实这样做增加了一些复杂性，之前的方法用户只需要编写一个main函数就可以了，其它什么不用管
-//而现在则需要了解entry宏
-entry!(main2);
-fn main2() -> ! {
-    //触发 HardFault exception
-    intrinsics::abort()
-}
 
-//自定义异常处理函数，用QEMU调试时候应该停留在这里
-#[no_mangle]
-#[allow(non_snake_case)]
-pub fn HardFault(_ef: *const u32) -> ! {//因为HardFaultTrampoline会传递参数，因此函数签名也要同步修改
+entry!(main);
+
+fn main() -> ! {
+    let mut hstdout = hio::hstdout().unwrap();
+
+    #[export_name = "Hello, world!"]// 将日志信息编码到静态变量A的符号名中，
+    static A: u8 = 0;
+
+    // 将地址的值作为usize输出
+    let _ = writeln!(hstdout, "{:#x}", &A as *const u8 as usize);
+
+    #[export_name = "Goodbye"]
+    static B: u8 = 0;
+
+    let _ = writeln!(hstdout, "{:#x}", &B as *const u8 as usize);
+
+    debug::exit(debug::EXIT_SUCCESS);
+
     loop {}
-}
+} 
