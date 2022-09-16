@@ -1,29 +1,37 @@
 #![no_main]
 #![no_std]
 
-use core::fmt::Write;
-//使用semihosting技术进行输出，因为QEMU直接支持semihosting。而在真机环境则可能需要用到串口等技术
-use cortex_m_semihosting::{debug, hio};
+use cortex_m_semihosting::{
+    debug,
+    hio::{self, HostStream}//0.5.0之后改为使用HostStream结构体，原文中是使用HStdout
+};
 
+use log::{log, Log};
 use rt::entry;
+
+struct Logger {
+    hstdout: HostStream,
+}
+
+impl Log for Logger {
+    type Error = ();
+
+    fn log(&mut self, address: u8) -> Result<(), ()> {
+        self.hstdout.write_all(&[address])
+    }
+}
 
 entry!(main);
 
 fn main() -> ! {
-    let mut hstdout = hio::hstdout().unwrap();
+    let hstdout = hio::hstdout().unwrap();
+    let mut logger = Logger { hstdout };
 
-    #[export_name = "Hello, world!"]// 将日志信息编码到静态变量A的符号名中，
-    static A: u8 = 0;
+    let _ = log!(logger, "Hello, world!");
 
-    // 将地址的值作为usize输出
-    let _ = writeln!(hstdout, "{:#x}", &A as *const u8 as usize);
-
-    #[export_name = "Goodbye"]
-    static B: u8 = 0;
-
-    let _ = writeln!(hstdout, "{:#x}", &B as *const u8 as usize);
+    let _ = log!(logger, "Goodbye");
 
     debug::exit(debug::EXIT_SUCCESS);
 
     loop {}
-} 
+}
