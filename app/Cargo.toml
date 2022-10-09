@@ -9,3 +9,4 @@ edition = "2021"
 rt = {path ="../rt"}
 log = {path ="../log"}
 cortex-m-semihosting  = "0.5.0"
+cortex-m = "0.7.6"
