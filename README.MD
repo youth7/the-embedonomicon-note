@@ -1,11 +1,20 @@
-# 《The embedonomicon》
+# 《The embedonomicon》学习笔记
 
-# 0 前言
+# 和原教程的一些差异
+
+  * 重写了第五章，因为`!asm`和`!global_asm`已经进入stable，原文那种方式实在太繁琐。
+  * Rust Edition原书采用2018，本文采用2021。按照官方的说法，Rust Edition和Rust的版本应该是独立的，基于任何一个Rust Edition的代码应该都可以在最新版本的Rust编译器上编译。（*All Rust code, regardless of edition, is ultimately compiled to the same internal representation within the compiler.*）
+  * 原文中是通过cargo子命令的方式去调用cargo-binutils，例如使用`cargo size`而不是`rust-size`。个人觉得这样虽然简洁但是不够直观，因此我将使用直接调用的方式调用cargo-binutils
+  * 所有命令都是在powershell下运行的
+
+
+
+# 【0】前言
 
 [《The embedonomicon》](https://docs.rust-embedded.org/embedonomicon/preface.html)包含了以下内容：
 
 * 带领你从头开始构建`#![no_std]`应用程序（裸机编程）
-* 开发基于特定架构的Cortex-M微控制器的应用程序，并不断迭代这个开发过程
+* 开发基于特定架构的Cortex-M微控制器的应用程序，并不断迭代这个过程
 
 
 
@@ -19,40 +28,27 @@
 
 
 
-
-
 ## 前置条件
 
 因为本文是基于win10的，所以只介绍win10下相关工具的安装过程
 
 * Rust相关
-
-  * Rust编译器：原书采用1.31，本文采用1.60.0
-  * cargo-binutils：直接使用最新
-
+    * Rust编译器：原书采用1.31，本文采用1.60.0
+    * cargo-binutils：直接使用最新
+    
 * QEMU模拟器
-
-  采用7.0.0版本（[qemu-w64-setup-20220419.exe](https://qemu.weilnetz.de/w64/qemu-w64-setup-20220419.exe)）
-
+  
+    采用7.0.0版本（[qemu-w64-setup-20220419.exe](https://qemu.weilnetz.de/w64/qemu-w64-setup-20220419.exe)）
+    
 * gdb工具
 
-  使用[gcc-arm-none-eabi-10.3-2021.10-win32](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-win32.exe)或[arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi](https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/11.3.rel1/binrel/arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi.exe)。
-
-  >  注意不要使用gcc-arm-11.2-2022.02-mingw-w64-i686-arm-none-eabi，这个版本依赖过期的32位python2.7，在Win10上很难准备相关的运行环境给它，相关讨论见[这里](https://community.arm.com/support-forums/f/compilers-and-libraries-forum/52585/python-2-7-dependency-for-arm-none-eabi-gdb-at-windows-hosts)
-
-## 和原教程的一些差异
-
-  * Rust Edition原书采用2018，本文采用2021。按照官方的说法，Rust Edition和Rust的版本应该是独立的，基于任何一个Rust Edition的代码应该都可以在最新版本的Rust编译器上编译。（All Rust code, regardless of edition, is ultimately compiled to the same internal representation within the compiler.）
-  * 原文中是通过cargo子命令的方式去调用cargo-binutils，例如使用`cargo size`而不是`rust-size`。个人觉得这样虽然简洁但是不够直观，因此我将使用直接调用的方式调用cargo-binutils
-  * 所有命令都是在powershell下运行的
+    使用[gcc-arm-none-eabi-10.3-2021.10-win32](https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-win32.exe)或[arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi](https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/11.3.rel1/binrel/arm-gnu-toolchain-11.3.rel1-mingw-w64-i686-arm-none-eabi.exe)。
+    
+    >  注意不要使用gcc-arm-11.2-2022.02-mingw-w64-i686-arm-none-eabi，这个版本依赖过期的32位python2.7，在Win10上很难准备相关的运行环境给它，相关讨论见[这里](https://community.arm.com/support-forums/f/compilers-and-libraries-forum/52585/python-2-7-dependency-for-arm-none-eabi-gdb-at-windows-hosts)
 
   
 
-
-
-
-
-# 1 最小的`#![no_std]`程序
+# 【1】最小的`#![no_std]`程序
 
 这个章节主要是写一个`#![no_std]`版的hello world程序，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/01-the-smallest-nostd-program](https://github.com/youth7/the-embedonomicon-note/tree/01-the-smallest-nostd-program)
 
@@ -114,7 +110,6 @@ rust-nm  target/thumbv7m-none-eabi/debug/deps/app-*.o
 
 
 如果你安装了wsl2的话，可以用其它命令来查看符号，例如使用`readelf`来查看
-
 ```powershell
 readelf -s ./target/thumbv7m-none-eabi/debug/deps/*.o
 ```
@@ -155,6 +150,8 @@ nm ./target/thumbv7m-none-eabi/debug/deps/*.o
 
 刚开始的时候觉得两者都是程序崩溃时调用的，它们有什么区别？[文档](https://doc.rust-lang.org/stable/book/ch09-01-unrecoverable-errors-with-panic.html)是这样解释的：
 
+>## Unwinding the Stack or Aborting in Response to a Panic
+>
 >By default, when a panic occurs, the program starts *unwinding*, which means Rust walks back up the stack and cleans up the data from each function it encounters. However, this walking back and cleanup is a lot of work. Rust, therefore, allows you to choose the alternative of immediately *aborting*, which ends the program without cleaning up. Memory that the program was using will then need to be cleaned up by the operating system. If in your project you need to make the resulting binary as small as possible, you can switch from unwinding to aborting upon a panic by adding `panic = 'abort'` to the appropriate `[profile]` sections in your *Cargo.toml* file. For example, if you want to abort on panic in release mode, add this:
 >
 >```
@@ -162,9 +159,7 @@ nm ./target/thumbv7m-none-eabi/debug/deps/*.o
 >panic = 'abort'
 >```
 
-
-
-我个人的疑问是这两个设定是相互独立的吗，还是说默认的`#[panic_handler]`实现里面包含了`eh_personality`？
+可见前者是程序panic时候调用的，而运行panic处理程序时候，可以选择是unwind stack或者直接abort。我个人的疑问是这两个设定是相互独立的吗，还是说`#[panic_handler]`指向的实现里面包含了`eh_personality`？
 
 但无论如何，**在本文的运行环境下并不需要对`eh_personality`做任何修改**
 
@@ -172,7 +167,7 @@ nm ./target/thumbv7m-none-eabi/debug/deps/*.o
 
 
 
-# 2 内存布局
+# 【2】内存布局
 
 这个章节主要是介绍如何通过各种工具来调整内存布局，使得生成的二进制程序能够在裸机上运行，并通过gdb来验证生成的程序是否正确，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/02-memory-layout](https://github.com/youth7/the-embedonomicon-note/tree/02-memory-layout)
 
@@ -192,7 +187,7 @@ nm ./target/thumbv7m-none-eabi/debug/deps/*.o
 
 vector_table是一个指针数组，里面每个元素（vector）都指向了某个内存地址（大部分是异常处理函数的起始地址），关于它的具体结构可以看[这里](https://documentation-service.arm.com/static/5ea823e69931941038df1b02?token=)。对本教程来说最重要的是前2个指针：
 
-* 第1个：（`Initial SP value`）栈顶指针，用于初始化栈
+* 第1个：（`ISP：Initial SP value`）栈顶指针，用于初始化栈
 * 第2个：（`Reset`）指向了`reset handler`，它是一个函数，会在系统被重置或者加电时运行（同时也是程序栈帧里面的第一帧）。
 
 所以我们需要做的事情就是：
@@ -305,7 +300,7 @@ SECTIONS
 
 * ELF中undefined symbol的相关知识，可以参考[这里](https://docs.oracle.com/cd/E19120-01/open.solaris/819-0690/chapter2-9/index.html)。
 
-* 文档说`EXTERN`与`-u`等价，`-u`中有这么一句：If this option is being used to force additional modules to be pulled into the link，这可能就是文章中使用`EXTERN的目的`
+* 文档说`EXTERN`与`-u`等价，`-u`中有这么一句：*If this option is being used to force additional modules to be pulled into the link*，这可能就是文章中使用`EXTERN的目的`
 
 
 
@@ -427,7 +422,7 @@ Symbol table '.symtab' contains 5 entries:
 
 
 
-## 测试
+## 测试一下
 
 用以下命令启动一个Qemu模拟器，打开一个gdb服务器并监听端口3333
 
@@ -465,7 +460,7 @@ $3 = (*mut i32) 0x2000fffc
 
 
 
-# 3 `main`接口
+# 【3】`main`接口
 
 本章节主要介绍了如何将上一章节的成果从binary package转化为lib package，以便其他开发者可以使用它来开发自己的应用程序。这样相当于建立了一个抽象层，屏蔽了裸机相关的内容，开发者只需编写自己的`main`程序即可。本章难点在于理解为何需要初始化内存，以及如何初始化内存，完整代码见：[https://github.com/youth7/the-embedonomicon-note/tree/03-main-interface](https://github.com/youth7/the-embedonomicon-note/tree/03-main-interface)
 
@@ -526,6 +521,7 @@ $3 = (*mut i32) 0x2000fffc
       Ok(())
   }
   ```
+  
 
  注：当在`rt`下修改`build.rs`时会触发自动编译，此时`OUT_DIR`指向`rt/target`下的子目录；而编译`app`时`OUT_DIR`则指向`app/target`下的子目录，这意味着`link.x`会被复制到项目`app`中。
 
@@ -794,9 +790,1045 @@ Program Headers:
 
 
 
-# 异常处理
+# 【4】异常处理
 
-这一节是通过完善vector table，为`rt`增加更多的中断处理程序
+这一章是通过完善vector table，为`rt`增加更多的异常处理程序，同时实践*编译期重写（compile time overridable behavior）*这个功能。这节完整代码见[这里](https://github.com/youth7/the-embedonomicon-note/tree/04-Exception-handling)。
+
+本章主要完成两个功能：
+
+* 为`rt`中vector table中的其它项提供一个默认值（在此之前只提供了前两项）
+* 用户在使用`rt`的时候，能够用自定义的函数去覆盖vector table中的默认函数
+
+关于中断、异常（trap）、陷入的概念请参考[这里](http://rcore-os.cn/rCore-Tutorial-Book-v3/chapter0/3os-hw-abstract.html)
+
+### 调整Rust代码
+
+为了演示方便，只修改vector table的前16个函数，因为它们与设备无关，且适用于所有Cortex-M系列的微控制器。先修改`lib.rs`
+
+```rust
+pub union Vector {
+    // 一个Vector就是vector table中的一项，根据arm的文档，每一项要么是一个异常处理函数，要么是预留（值为0）
+    reserved: u32,
+    handler: unsafe extern "C" fn(),
+}
+
+extern "C" {
+    //声明会用到的外部函数，因为有可能是用户提供的所以必须用extern，不明白为何是C规范而不是Rust规范，
+    //注意这里只是声明并没有提供具体实现，实现有两种，一种是使用默认的DefaultExceptionHandler；一种是用户提供
+    fn NMI();
+    fn HardFault();
+    fn MemManage();
+    fn BusFault();
+    fn UsageFault();
+    fn SVCall();
+    fn PendSV();
+    fn SysTick();
+}
+
+#[link_section = ".vector_table.exceptions"]// 将异常处理函数保存到节.vector_table.exceptions中
+#[no_mangle]
+pub static EXCEPTIONS: [Vector; 14] = [//定义vector table中剩余的14项
+    Vector { handler: NMI },
+    Vector { handler: HardFault },
+    Vector { handler: MemManage },
+    Vector { handler: BusFault },
+    Vector { handler: UsageFault},
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { handler: SVCall },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { handler: PendSV },
+    Vector { handler: SysTick },
+];
+
+#[no_mangle]
+pub extern "C" fn DefaultExceptionHandler() {// 定义一个默认的异常处理函数
+    loop {}
+}
+```
+
+
+
+### 调整链接脚本
+
+```link
+EXTERN(EXCEPTIONS); 
+
+SECTIONS
+{
+  .vector_table ORIGIN(FLASH) :
+  {
+    /* vector table第一项：ISP */
+    LONG(ORIGIN(RAM) + LENGTH(RAM));
+
+    /* vector table第二项 */
+    KEEP(*(.vector_table.reset_vector));
+
+    KEEP(*(.vector_table.exceptions)); /* 将剩余的14个异常处理函数保存到flash中，加上上面已有的两项刚好16项 */
+  } > FLASH
+
+  /* 为符号提供默认值，只有当用户未提供自定义的异常处理程序时候才会生效，注意被提供默认值的项都是在lib.rs中声明过的外部函数 */
+  PROVIDE(NMI = DefaultExceptionHandler);
+  PROVIDE(HardFault = DefaultExceptionHandler);
+  PROVIDE(MemManage = DefaultExceptionHandler);
+  PROVIDE(BusFault = DefaultExceptionHandler);
+  PROVIDE(UsageFault = DefaultExceptionHandler);
+  PROVIDE(SVCall = DefaultExceptionHandler);
+  PROVIDE(PendSV = DefaultExceptionHandler);
+  PROVIDE(SysTick = DefaultExceptionHandler);
+...
+```
+
+
+
+### 测试一下
+
+先修改`main.rs`，在`main2()`中触发一个异常
+
+```rust
+#![no_std]
+#![no_main]
+#![feature(core_intrinsics)]// 因为使用了core_intrinsics的原因，必须切换到nightly来构建
+
+use core::intrinsics;
+use rt::entry;
+//使用rt中暴露出来的宏来调用用户编写的函数，此时用户编写的函数可以用其它名称，例如这里就用了main2
+//其实这样做增加了一些复杂性，之前的方法用户只需要编写一个main函数就可以了，其它什么不用管
+//而现在则需要了解entry宏
+entry!(main2);
+fn main2() -> ! {
+    //触发 HardFault exception
+    intrinsics::abort()
+}
+```
+
+因为用到了core_intrinsics，因此需要切换到nightly中编译
+
+```powershell
+rustup default nightly # 切换为nightly
+rustup target add thumbv7m-none-eabi #在nightly下需要先重新安装target和其它相关工具
+cargo  build --bin app# 编译项目
+```
+
+然后按照第二章中的方法启动QEMU和GDB进行调试（注意需要在`app`项目的根目录下进行）
+
+```powershell
+(gdb)  target remote :3333
+Remote debugging using :3333
+rt::Reset () at src/lib.rs:12
+12      pub unsafe extern "C" fn Reset() -> ! {
+(gdb) b DefaultExceptionHandler # 在默认的异常处理函数DefaultExceptionHandler设置一个断点
+Breakpoint 1 at 0x100: file src/lib.rs, line 103.
+(gdb) c # 继续运行
+Continuing.
+
+# intrinsics::abort()触发异常，使得执行流程切换到DefaultExceptionHandler中
+Breakpoint 1, rt::DefaultExceptionHandler () at src/lib.rs:103 
+103         loop {}
+(gdb) list # 列出断点附近的源码
+98          Vector { handler: SysTick },
+99      ];
+100
+101     #[no_mangle]
+102     pub extern "C" fn DefaultExceptionHandler() {// €
+103         loop {}
+104     }
+(gdb)
+```
+
+
+
+安全起见检查vector table是否符合我们的预期，通过以下命令编译并检查
+
+````powershell
+cargo build --bin app --release # 使用release模式编译
+.\target\thumbv7m-none-eabi\release\app -s -j .vector_table #查看.vector_table内容 
+````
+
+ 输出如下：
+
+```powershell
+.\target\thumbv7m-none-eabi\release\app:        file format elf32-littlearm
+Contents of section .vector_table:
+ 0000 00000120 45000000 83000000 83000000  ... E...........
+ 0010 83000000 83000000 83000000 00000000  ................
+ 0020 00000000 00000000 00000000 83000000  ................
+ 0030 00000000 00000000 83000000 83000000  ................
+```
+
+可见.vector_table中有16项，对比一下各项的值可知它确实和`lib.rs`中的`EXCEPTIONS`数组是一致的（0x83000000就是默认的异常函数的值）。此外需要留意第4项，它是异常处理函数`HardFault()`的地址，下一节我们会在`app`中覆盖这个函数，覆盖后它的地址就不再是0x83000000。
+
+
+
+### 用户自定义异常处理函数
+
+因为在`lib.rs`中声明了各个异常处理函数为extern，所以用户可以在外部自定义异常处理函数来替代`rt`中的`DefaultExceptionHandler()`，这只需要在`rt`的`main.rs`中定义符合签名的函数即可。
+
+```rust
+
+#[no_mangle]
+pub extern "C" fn HardFault() -> ! {
+    //自定义异常处理函数，用QEMU调试时候应该停留在这里
+    loop {}
+}
+```
+
+然后像上面那样编译debug，可以发现代码确实停留在用户自定义的` HardFault()`
+
+```powershell
+(gdb) target remote :3333
+Remote debugging using :3333
+rt::Reset () at src/lib.rs:12
+12      pub unsafe extern "C" fn Reset() -> ! {
+(gdb) b HardFault
+Breakpoint 1 at 0x44: file src/main.rs, line 19.
+(gdb) c
+Continuing.
+
+Breakpoint 1, app::HardFault () at src/main.rs:19
+19          loop {}
+(gdb) list
+14      }
+15
+16      #[no_mangle]
+17      pub extern "C" fn HardFault() -> ! {
+18          //QEMU€
+19          loop {}
+20      }
+```
+
+再像上一小节那样编译并检查.vector_table
+
+```powershell
+.\target\thumbv7m-none-eabi\release\app:        file format elf32-littlearm
+Contents of section .vector_table:
+ 0000 00000120 47000000 85000000 41000000  ... G.......A...
+ 0010 85000000 85000000 85000000 00000000  ................
+ 0020 00000000 00000000 00000000 85000000  ................
+ 0030 00000000 00000000 85000000 85000000  ................
+```
+
+此时`DefaultExceptionHandler()`的地址变成了0x85000000，但是第4项`HardFault()`的值和`DefaultExceptionHandler()`不一样，这是因为用户在`app`中定义了自己的异常处理函数。
+
+
+
+
+
+# 【5】使用新方法写汇编
+
+这一章主要是在代码中嵌入汇编来修改寄存器的值，从而实现为`HardFault()`传递参数。原文编写时候`asm!`和`global_asm!`尚未稳定，因此是使用旧方式嵌入汇编。这种方式非常繁琐，因此我将它改为用`asm!`来实现。完整代码见[这里](https://github.com/youth7/the-embedonomicon-note/tree/05-assembly-on-stable)
+
+在上一章中，我们将`HardFault()`放置到vector table的特定位置，当对应的异常发生时候`HardFault()`就会被调用。而本章不再将`HardFault()`直接放置到vector table，而是创建一个辅助函数`HardFaultTrampoline()`并将它放置到vector table，然后通过它来调用`HardFault()`。而`HardFaultTrampoline()`在调用`HardFault()`前会修改特定寄存器的值，从而实现为`HardFault()`传参。
+
+## 修改`rt`
+
+首先修改`lib.rs`如下：
+
+```rust
+extern "C" {
+    fn NMI();
+    // fn HardFault();删除对HardFault的声明，因为不需要在rust代码中调用它
+    fn MemManage();
+    fn BusFault();
+    fn UsageFault();
+    fn SVCall();
+    fn PendSV();
+    fn SysTick();
+}
+
+#[link_section = ".vector_table.exceptions"]// 将异常处理函数保存到节.vector_table.exceptions中
+#[no_mangle]
+pub static EXCEPTIONS: [Vector; 14] = [//定义vector table中剩余的14项
+    Vector { handler: NMI },
+    Vector { handler: HardFaultTrampoline },// 改为使用辅助函数，通过它去调用HardFault
+    Vector { handler: MemManage },
+    Vector { handler: BusFault },
+    Vector { handler: UsageFault},
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { handler: SVCall },
+    Vector { reserved: 0 },
+    Vector { reserved: 0 },
+    Vector { handler: PendSV },
+    Vector { handler: SysTick },
+];
+
+#[allow(non_snake_case)]
+#[no_mangle]
+pub fn DefaultExceptionHandler(_ef: *const u32) -> ! {//因为HardFaultTrampoline会传递参数，因此函数签名也要同步修改
+    loop {}
+}
+```
+
+
+
+将`HardFaultTrampoline()`放置到vertor table，取代原来的`HardFault()`。它的功能是读取当前栈指针的值，然后将它作为参数传递给`HardFault()`，这样`HardFault()`就可以读取异常发生时候栈里面的内容了。为何不直接在`HardFault()`中读取栈指针呢？因为`HardFault()`是用Rust写的，无法直接访问寄存器的值。
+
+然后在`lib.rs`中使用汇编实现`HardFaultTrampoline()`
+
+```rust
+#[no_mangle]
+extern "C" fn HardFaultTrampoline() {
+    unsafe{
+        asm!(
+          "mrs r0, MSP",
+          "b HardFault"
+        )
+    }
+}
+```
+
+
+
+## 修改`app`
+
+因为`HardFaultTrampoline()`会给`HardFault()`传参，所以需要修改`main.rs`中`HardFault()`的签名
+
+```rust
+#[no_mangle]
+#[allow(non_snake_case)]
+pub fn HardFault(_ef: *const u32) -> ! {//因为HardFaultTrampoline会传递参数，因此函数签名也要同步修改
+    loop {}
+}
+```
+
+## 测试一下
+
+然后用以下命令编译并检查汇编代码
+
+ ```powershell
+  cargo build --bin app --release #编译
+  rust-objdump -d --print-imm-hex --no-show-raw-insn .\target\thumbv7m-none-eabi\release\app #显示汇编
+ ```
+
+ 会有以下输出
+
+```powershell
+.\target\thumbv7m-none-eabi\release\app:        file format elf32-littlearm
+
+Disassembly of section .text:
+
+00000040 <HardFault>:
+      40:       b       0x40 <HardFault>        @ imm = #-0x4
+
+00000042 <main>:
+      42:       trap
+      44:       trap
+
+00000046 <Reset>:
+      46:       push    {r7, lr}
+      48:       mov     r7, sp
+      4a:       bl      0x42 <main>             @ imm = #-0xc
+      4e:       trap
+
+00000050 <UsageFault>:
+      50:       b       0x50 <UsageFault>       @ imm = #-0x4
+
+00000052 <HardFaultTrampoline>:
+      52:       push    {r7, lr}# 比我们的汇编多了两行，可能是因为函数调用导致生成了保存寄存器的代码
+      54:       mov     r7, sp
+      56:       mrs     r0, msp
+      5a:       b.w     0x40 <HardFault>        @ imm = #-0x1e
+      5e:       pop     {r7, pc}
+```
+
+可知`HardFaultTrampoline()`的地址是0x00000052，再检查一下vector table的内容
+
+```powershell
+rust-objdump -s -j .vector_table  .\target\thumbv7m-none-eabi\release\app
+```
+
+输出如下：
+
+```powershell
+.\target\thumbv7m-none-eabi\release\app:        file format elf32-littlearm
+Contents of section .vector_table:
+ 0000 00000120 47000000 51000000 53000000  ... G...Q...S...
+ 0010 51000000 51000000 51000000 00000000  Q...Q...Q.......
+ 0020 00000000 00000000 00000000 51000000  ............Q...
+ 0030 00000000 00000000 51000000 51000000  ........Q...Q...
+```
+
+留意第4项的值为0x53000000（Thumb mode），此时证实`HardFaultTrampoline()`确实已经生效。
+
+
+
+# 【6】利用符号进行日志输出
+
+在嵌入式系统中，常见的日志输入/输出方式有以下几种：
+
+* 串口：将日志信息写到串口，串口的接收端连接着显示设备
+* 内存：将日志信息写到RAM中，然后再从RAM中读取
+* 文件：将日志信息写到文件，这要求设备必须有sd卡或者片外flash（出现文件概念的话意味着需要OS支持？）
+* 嵌入式设备自带的显示模块、网络网口等
+
+本章主要是2和3的混合体，不过略有区别：不是直接输出日志内容（字符串），而是输出日志内容的地址，然后再根据地址去ELF文件中查找日志的具体内容。（为何不直接输出字符串？是因为在嵌入式中不容易实现？）
+
+具体步骤如下：
+
+1. 在Rust代码中定义若干变量，
+2. 修改变量在ELF中的符号名（*symbol name*），将日志内容嵌入到符号名中，则经过编译后日志的内容便存储到ELF中
+3. 在Rust代码中输出变量的地址，在符号表中查询这些地址便能得到日志的内容
+
+完整代码请看[这里](https://github.com/youth7/the-embedonomicon-note/tree/06-logging-with-symbols)
+
+## 修改变量导出的符号名称的例子
+
+创建一个名为foo的lib package，然后修改`lib.rs`文件如下：
+
+```rust
+#![allow(unused)]
+fn main() {
+    #[export_name = "Hello, world!"] //修改变量A的符号名
+    #[used]// 要求编译器不要丢弃静态变量A，即使它没有被使用
+    static A: u8 = 0;
+
+    #[export_name = "你好，这是一个中文句子"]
+    #[used]// 要求编译器不要丢弃静态变量B，即使它没有被使用
+    static B: u8 = 0;//修改变量B的符号名
+}
+
+```
+
+接着编译并检查符号表
+
+```powershell
+cargo build --lib;rust-nm .\target\debug\libfoo.rlib
+```
+
+会有以下输出：
+
+```powershell
+   Compiling foo v0.1.0 (D:\workspace\rust\app\foo)
+    Finished dev [unoptimized + debuginfo] target(s) in 0.09s
+
+foo-71f85fa4234f96d2.3bevs2kbnkn4yeof.rcgu.o:
+00000000 a @feat.00
+00000000 R Hello, world!
+00000000 D __imp_Hello, world!
+00000000 D __imp_你好，这是一个中文句子
+00000000 R 你好，这是一个中文句子
+
+lib.rmeta:
+.\target\debug\libfoo.rlib:lib.rmeta: no symbols
+```
+
+可见我们成功将一些自定义信息当做符号名写入了ELF中。
+
+## 将日志信息编码到符号名中
+
+通过以下步骤将日志信息编码
+
+1. 为每条日志创建一个对应的`static`类型变量，但变量本身不存储日志的内容，日志的内容是通过attribute编码到符号名中
+2. 将步骤1中的变量的地址输出到控制台
+
+先修改`app`中的`main.rs`
+
+```rust
+#![no_main]
+#![no_std]
+
+use core::fmt::Write;
+//使用semihosting技术进行输出，因为QEMU直接支持semihosting。而在真机环境则可能需要用到串口等技术
+use cortex_m_semihosting::{debug, hio};
+
+use rt::entry;
+
+entry!(main);
+
+fn main() -> ! {
+    let mut hstdout = hio::hstdout().unwrap();
+
+    #[export_name = "Hello, world!"]// 将日志信息编码到静态变量A的符号名中，
+    static A: u8 = 0;
+
+    // 将地址的值作为usize输出
+    let _ = writeln!(hstdout, "{:#x}", &A as *const u8 as usize);
+
+    #[export_name = "Goodbye"]
+    static B: u8 = 0;
+
+    let _ = writeln!(hstdout, "{:#x}", &B as *const u8 as usize);
+
+    debug::exit(debug::EXIT_SUCCESS);
+
+    loop {}
+}
+```
+
+然后引入相关依赖
+
+```toml
+[dependencies]
+cortex-m-semihosting = "0.5.0"
+rt = { path = "../rt" }
+```
+
+最后构建并运行
+
+```powershell
+cargo build #构建
+
+#开启semihosting运行
+qemu-system-arm `
+    -cpu cortex-m3 `
+    -machine lm3s6965evb `
+    -nographic `
+    -semihosting-config enable=on,target=native `
+    -kernel target/thumbv7m-none-eabi/debug/app
+```
+
+会有如下输出：
+
+```powershell
+Timer with period zero, disabling
+0x1c4c
+0x1c4d
+```
+
+
+
+每次都要构建后再运行一大串QEMU命令是很繁琐的，可以通过修改`.cargo/config`来简化：
+
+```toml
+[target.thumbv7m-none-eabi]
+# 增加runner的相关配置项
+runner = "qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel"
+```
+
+这样构建和运行可以简化为一行命令：`cargo run --release`
+
+```powershell
+PS D:\workspace\rust\app\app> cargo run --release
+    Finished release [optimized] target(s) in 0.03s
+     Running `qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel target\thumbv7m-none-eabi\release\app`
+Timer with period zero, disabling
+0x11ec
+0x11ed
+```
+
+
+
+## 从地址中解码出日志信息
+
+在上一步中我们得到了变量的地址，现在需要在符号表中查找这些地址，从而获得这些地址对应的符号名，这可以通过以下命令完成
+
+```powershell
+rust-objdump .\target\thumbv7m-none-eabi\debug\app -t | findstr "00000001"
+```
+
+然后有以下输出：
+
+```powershell
+#从左到右各列的意义是：符号地址 | 符号的flag | 跟符号相关的节的序号 | 所属的节 | 符号长度 | 符号名
+00001c4c g     O .rodata        00000001 Hello, world!
+00001c4d g     O .rodata        00000001 Goodbye
+```
+
+用`findstr`去查找objdump的输出中含有字符串`00000001`的行，如无意外应该只会找到我们定义的两个符号，因为静态变量`A`和`B`的类型都是`u8`，只占一个字节，所以第五列（符号长度）的值必然是`00000001`。
+
+
+
+## 一些改进
+
+在之前的实现中，静态变量被编译后会存储到`.rodata`节，这意味着把ELF烧录到flash中后这些静态依然占据空间，即使它们的值并没有被使用（只用到了它们的地址）。因此要想一个办法让程序不要加载这些节从而节省空间，这需要使用链接脚本。
+
+在`app`中创建一个新的链接脚本`log.x`并添加以下内容：
+
+```link
+SECTIONS
+{
+  .log 0 (INFO) : {
+    *(.log);
+  }
+}
+```
+
+这段代码的意义如下：
+
+* 收集所有input目标文件中的名为`.log`的节，然后在output目标文件中生成名为`.log`的节
+
+* `INFO`表示该节在运行时不需要在内存中分配空间
+
+* `0`表示该节的的加载地址（设为`0`是有它的特殊意义的，等下再说）
+
+然后修改`app`中的`main.rs`为：
+
+```rust
+#![no_main]
+#![no_std]
+
+//使用semihosting技术进行输出，因为QEMU直接支持semihosting。而在真机环境则可能需要用到串口等技术
+use cortex_m_semihosting::{debug, hio};
+
+use rt::entry;
+
+entry!(main);
+
+fn main() -> ! {
+    let mut hstdout = hio::hstdout().unwrap();
+
+    #[export_name = "Hello, world!"]// 将日志信息编码到静态变量A的符号名中，
+    #[link_section = ".log"]// 指定该静态变量输出到.log这个节
+    static A: u8 = 0;
+
+    // 将地址的值作为usize输出
+    let address = &A as *const u8 as usize as u8;
+    hstdout.write_all(&[address]).unwrap(); // 不使用core中的格式化I/O，改为使用第三方依赖的二进制I/O
+
+    #[export_name = "Goodbye"]
+    #[link_section = ".log"]// 指定该静态变量输出到.log这个节
+    static B: u8 = 0;
+
+    let address = &B as *const u8 as usize as u8;
+    hstdout.write_all(&[address]).unwrap(); // 不使用core中的格式化I/O，改为使用第三方依赖的二进制I/O
+
+    debug::exit(debug::EXIT_SUCCESS);
+
+    loop {}
+}
+```
+
+代码中最值得留意的地方有两点：
+
+* 将变量的地址类型强转为`u8`
+* 不使用core中的格式化I/O，改为使用第三方依赖的二进制I/O
+
+因为改为了二进制I/O，因此会涉及到多字节的序列化问题，为了避免这个问题干脆将地址改为单个字节。但地址本来是4字节的，这样可能会导致地址的值被截断。为了避免截断的问题我们将`.log`的加载地址设为0，同时将地址的取值范围限制为[0, 255]，这样就能保证地址能够用单个字节来精确表示，避开了被截断的问题。但弊端就是最多只能使用255条日志。
+
+最后在`.cargo/config`中指定新的链接脚本
+
+```link
+# 针对这个target使用链接脚本
+[target.thumbv7m-none-eabi]
+rustflags = [
+    "-C", "link-arg=-Tlink.x",
+    "-C", "link-arg=-Tlog.x"
+]
+runner = "qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel"
+# 指定编译的target，修改这里之后就无需在命令行传递--target参数了
+[build]
+target = "thumbv7m-none-eabi"
+```
+
+
+
+然后运行`cargo run --release | Format-Hex`，会有以下输出（注意，原文中是用linux中的`xxd`来显示二进制输出，这里用Win11中powershell自带的的`Format-Hex`来代替）：
+
+```powershell
+    Finished dev [unoptimized + debuginfo] target(s) in 0.03s
+     Running `qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel target\thumbv7m-none-eabi\debug\app`      
+Timer with period zero, disabling
+
+
+           00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+
+00000000   00 01 
+```
+
+可见输出的地址是0x00和0x01，在.log节中查找这两个地址：
+
+```powershell
+rust-objdump .\target\thumbv7m-none-eabi\release\app -t | findstr log
+```
+
+会有以下输出
+
+```powershell
+00000000 g     O .log   00000001 Hello, world!
+00000001 g     O .log   00000001 Goodbye
+```
+
+一切都符合预期。
+
+## 抽象为一个库
+
+上面虽然已经实现了输出日志，但是这个过程还是相当繁琐用且不直观的，用户的期望的输出日志应该像使用`std::println!`那么简单，为实现这个目的我们需要将上面的逻辑封装为一个lib crate。
+
+先用命令`cargo new --lib log`创建一个名为`lib`的lib package，然后修改`lib.rs`的内容为：
+
+```rust
+#![no_std]
+
+pub trait Log {
+    type Error;
+
+    fn log(&mut self, address: u8) -> Result<(), Self::Error>;
+}
+
+#[macro_export]
+macro_rules! log {
+    ($logger:expr, $string:expr) => {{//用户调用宏的时候参数包括2个：一个log Trait实例；一个日志字符串
+        #[export_name = $string]
+        #[link_section = ".log"]
+        static SYMBOL: u8 = 0;// 每条日志字符串都有一个对应的静态变量
+
+        $crate::Log::log(&mut $logger, &SYMBOL as *const u8 as usize as u8)
+        // 由用户提供具体的输出实现，但是对于本教程来说，个人认为应该由库提供实现才对，这样用户就无需关注这方面的细节
+    }};
+}
+```
+
+和之前的`rt`一样，需要提供`build.rs`用于构建时复制`log.x`
+
+```rust
+use std::{env, error::Error, fs::File, io::Write, path::PathBuf};
+
+fn main() -> Result<(), Box<dyn Error>> {
+    // Put the linker script somewhere the linker can find it
+    let out = PathBuf::from(env::var("OUT_DIR")?);
+
+    File::create(out.join("log.x"))?.write_all(include_bytes!("log.x"))?;
+
+    println!("cargo:rustc-link-search={}", out.display());
+
+    Ok(())
+}
+```
+
+最后修改`app`中的`main.rs`，让它调用`log`中的宏来输出日志
+
+```rust
+#![no_main]
+#![no_std]
+
+use cortex_m_semihosting::{
+    debug,
+    hio::{self, HostStream}//0.5.0之后改为使用HostStream结构体，原文中是使用HStdout
+};
+
+use log::{log, Log};
+use rt::entry;
+
+struct Logger {
+    hstdout: HostStream,
+}
+
+impl Log for Logger {
+    type Error = ();
+
+    fn log(&mut self, address: u8) -> Result<(), ()> {
+        self.hstdout.write_all(&[address])
+    }
+}
+
+entry!(main);
+
+fn main() -> ! {
+    let hstdout = hio::hstdout().unwrap();
+    let mut logger = Logger { hstdout };
+
+    let _ = log!(logger, "Hello, world!");
+
+    let _ = log!(logger, "Goodbye");
+
+    debug::exit(debug::EXIT_SUCCESS);
+
+    loop {}
+}
+
+```
+
+此时打印日志所用的宏已经非常接近`println!`，比之前那种晦涩的方法好多了！同时不要忘记修改 `Cargo.toml` ，引入`log`作为依赖
+
+```toml
+[dependencies]
+rt = {path ="../rt"}
+log = {path ="../log"}
+cortex-m-semihosting  = "0.5.0"
+```
+
+最后运行一下`cargo run --release | Format-Hex`会有以下输出：
+
+```powershell
+    Finished release [optimized] target(s) in 0.71s
+     Running `qemu-system-arm -cpu cortex-m3 -machine lm3s6965evb -nographic -semihosting-config enable=on,target=native -kernel target\thumbv7m-none-eabi\release\app`
+Timer with period zero, disabling
+
+
+           00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+
+00000000   00 01   
+```
+
+按照上一小节的方法用`rust-objdump`去检查ELF文件，会发现相关位置就是我们日志中输出的字符串，这里不再重复
+
+## 日志分级
+
+实现日志分级的思想比较简单，如上所述我们地址的有效范围是[0, 255]，我们在这个区间之中取一点n，让[0, n]这个地址区间放error级别的日志地址，[n, 255]放warn级别的日志地址，则实现了日志分级。此时想专门看某种类型的日志的话，只需要拿特定范围的地址值去搜索ELF文件即可。
+
+首先我们需要修改`log`中的`lib.rs`，提供分别用于输出warn和error级别日志的宏：
+
+```rust
+#![no_std]
+
+pub trait Log {
+    type Error;
+    fn log(&mut self, address: u8) -> Result<(), Self::Error>;
+}
+
+// 输出error等级的日志
+#[macro_export]
+macro_rules! error {
+    ($logger:expr, $string:expr) => {{
+        #[export_name = $string]
+        #[link_section = ".log.error"] // 放置到.log.error这个节
+        static SYMBOL: u8 = 0;
+        $crate::Log::log(&mut $logger, &SYMBOL as *const u8 as usize as u8)//最终都是调用log函数，只是放置的地方不一样
+    }};
+}
+
+// 输出warn等级的日志
+#[macro_export]
+macro_rules! warn {
+    ($logger:expr, $string:expr) => {{
+        #[export_name = $string]
+        #[link_section = ".log.warning"] // 放置到.log.warning这个节
+        static SYMBOL: u8 = 0;
+        $crate::Log::log(&mut $logger, &SYMBOL as *const u8 as usize as u8)//最终都是调用log函数，只是放置的地方不一样
+    }};
+}
+```
+
+然后调整链接脚本，让不同级别的日志按照我们上面描述的方式放置，注意`__log_warning_start__`就是我们上面说的`n`，它是不同级别日志的分界点
+
+```link
+SECTIONS
+{
+  .log 0 (INFO) : {
+    *(.log.error);              /*前面部分放置error级别日志*/
+    __log_warning_start__ = .;  /*将当前地址值与符号__log_warning_start__关联起来，意味着剩下地址存的都是警告级别的日志*/
+    *(.log.warning);            /*剩下部分放置warning级别日志*/
+  }
+}
+```
+
+最后修改`app`中的`main.rs`，使用新的宏来输出不同级别的日志
+
+```rust
+#![no_main]
+#![no_std]
+
+use cortex_m_semihosting::{
+    debug,
+    hio::{self, HostStream}//0.5.0之后改为使用HostStream结构体，原文中是使用HStdout
+};
+
+use log::{error, warn, Log};
+use rt::entry;
+
+struct Logger {
+    hstdout: HostStream,
+}
+
+impl Log for Logger {
+    type Error = ();
+    fn log(&mut self, address: u8) -> Result<(), ()> {
+        self.hstdout.write_all(&[address])
+    }
+}
+
+entry!(main);
+
+fn main() -> ! {
+    let hstdout = hio::hstdout().unwrap();
+    let mut logger = Logger { hstdout };
+    let _ = warn!(logger, "Hello, world!");
+    let _ = error!(logger, "Goodbye");
+    let _ = error!(logger, "你好呀");
+    let _ = warn!(logger, "是的师父！");
+    debug::exit(debug::EXIT_SUCCESS);
+    loop {}
+}
+```
+
+用`cargo run --release | Format-Hex`运行程序，会有以下输出：
+
+```powershell
+           00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+
+00000000   02 00 01 03 
+```
+
+虽然rust代码里交错输出warn和error日志，但是这并不会改变它们的关系：**error日志的地址永远小于warn日志**。这是由链接脚本决定的，可以从输出中观察到这个规律。同时我们检查一下生成的二进制文件
+
+```bash
+# 进入wsl然后执行以下命令：
+objdump ./target/thumbv7m-none-eabi/release/app -t | grep log
+# 然后会有以下输出
+00000002 g     O .log   00000001 Hello, world!
+00000000 g     O .log   00000001 Goodbye
+00000001 g     O .log   00000001 你好呀
+00000003 g     O .log   00000001 是的师父！
+00000002 g       .log   00000000 __log_warning_start__
+# 在wsl执行的原因是程序中用了中文字符串，在powershell下用rust-objdump去解析的话会乱码，效果不好。如果没有安装wsl的话也可以像之前那样使用命令:
+# rust-objdump .\target\thumbv7m-none-eabi\release\app -t | findstr log
+```
+
+相比之前多了符号`__log_warning_start__`，地址值属于[0, `__log_warning_start__`]的符号都代表error级别日志；地址值属于[`__log_warning_start__`, 255]的符号都代表warn级别日志。
+
+
+
+# 【7】全局的单例对象
+
+本章主要是对上一章基进行改进，使得`log!`的使用更加像里的`std::println!`，即使用类似`log!(日志信息)`这样的API来输出日志。这种调用方式和之前相比少了一个`logger`对象，实现这个特性的原理是，注册一个全局的`logger`对象，从而使得用户在调用`log!`时不需要再提供`logger`。完整代码请见[这里](https://github.com/youth7/the-embedonomicon-note/tree/07-global-singletons)
+
+首先要修改`log`的`lib.rs`，它对外提供这些功能：
+
+* 让用户注册全局的单例对象`logger`
+* 提供`log!`宏，该宏可以使用全局或自定义的`logger`进行日志输出
+
+具体代码如下，一些重要的细节已经注释：
+
+```rust
+#![no_std]
+
+//关于Sync、Send的语义参考：https://www.zhihu.com/question/303273488/answer/2345814358
+pub trait GlobalLog: Sync {
+    /**
+    声明一个trait，全局的单例日志对象必须实现它，需要注意以下几点：
+    1，log方法只需要&self，不消耗所有权，因为它用的是单例的全局共享对象。
+    2，这里并没有像下面的Log trait那样定义一个关联的错误类型，这是为了简化细节。
+       将错误处理委托给用户，而不是由库指定错误处理规则并强制用户实现。
+    **/
+    fn log(&self, address: u8);
+}
+
+pub trait Log {
+    type Error;
+    fn log(&mut self, address: u8) -> Result<(), Self::Error>;
+}
+
+#[macro_export]
+macro_rules! log {
+    //该宏接受两种传参，第一种传参不需要提供日志对象，第二种传参需要提供日志对象
+
+    //第一种传参方式，此时会使用一个名为"LOGGER"的全局对象进行日志输出，它是一个定义在某处的全局对象
+    ($string:expr) => {
+        unsafe {
+            extern "Rust" {
+                //关于$crate请见：
+                //https://zjp-cn.github.io/tlborm/decl-macros/minutiae/hygiene.html?highlight=%24crate#unhygientic
+                //我们并不知道LOGGER的具体类型，但要求它必须实现了这里必须实现了GlobalLog，所以必须用trait object
+                static LOGGER: &'static dyn $crate::GlobalLog;
+            }
+
+            #[export_name = $string]
+            #[link_section = ".log"]
+            static SYMBOL: u8 = 0;
+
+            $crate::GlobalLog::log(LOGGER, &SYMBOL as *const u8 as usize as u8)
+        }
+    };
+
+    //第二种传参方式，需要用户自己提供日志对象进行输出，这是上一章的方式
+    ($logger:expr, $string:expr) => {{
+        #[export_name = $string]
+        #[link_section = ".log"]
+        static SYMBOL: u8 = 0;
+
+        $crate::Log::log(&mut $logger, &SYMBOL as *const u8 as usize as u8)
+    }};
+}
+
+//提供一个宏，让用户注册单例的全局日志对象，并将符号名称定为"LOGGER"，这样正好和上面对应
+#[macro_export]
+macro_rules! global_logger {
+    ($logger:expr) => {
+        #[no_mangle]
+        pub static LOGGER: &dyn $crate::GlobalLog = &$logger;
+    };
+}
+```
+
+
+
+然后我们修改`app/main.rs`来使用上述的新特性：
+
+```rust
+#![no_main]
+#![no_std]
+
+use cortex_m::interrupt;
+use cortex_m_semihosting::{
+    debug,
+    hio::{self, HostStream}//0.5.0之后改为使用HostStream结构体，原文中是使用HStdout
+};
+
+use log::{global_logger, log, GlobalLog};
+use rt::entry;
+
+struct Logger;
+
+global_logger!(Logger);//将Logger注册为全局logger，这样在使用log!宏的时候就不再需要提供logger对象
+
+entry!(main);
+
+fn main() -> ! {
+    log!("Hello, world!");//更为简洁的日志API，不需要主动提供logger对象
+    log!("Goodbye");
+    debug::exit(debug::EXIT_SUCCESS);
+    loop {}
+}
+
+//全局logger的实现
+impl GlobalLog for Logger {
+    fn log(&self, address: u8) {
+        //interrupt::free作用是在一个无中断的上下文环境中执行函数，这是访问static mut类型变量的要求
+        //因为HSTDOUT是静态变量，只有做到这样才能保证内存安全。
+        //这种机制就是所谓的临界区（critical section）
+        interrupt::free(|_| unsafe {
+            static mut HSTDOUT: Option<HostStream> = None;
+
+            // 延迟初始化
+            if HSTDOUT.is_none() {
+                HSTDOUT = Some(hio::hstdout()?);
+            }
+            let hstdout = HSTDOUT.as_mut().unwrap();
+            hstdout.write_all(&[address])
+        })
+        .ok(); // 调用ok()意味着忽略错误并返回Option
+    }
+}
+```
+
+不要忘记在`Cargo.toml`中引入新的依赖
+
+```toml
+[dependencies]
+rt = {path ="../rt"}
+log = {path ="../log"}
+cortex-m-semihosting  = "0.5.0"
+cortex-m = "0.7.6"
+```
+
+
+
+用`cargo run --release | Format-Hex`运行程序，会有以下输出：
+
+```powershell
+           00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+
+00000000   00 01 
+```
+
+使用全局单例对象来简化`log!`宏的目标已经达成。
+
+因为使用了trait object，因此可能会因为引入vtable（实现动态分派）而造成性能损耗。但LLVM似乎相当智能地做了优化，对比下面的命令和输出可以发现，在release模式下LOGGER都找不到了
+
+```powershell
+cargo objdump --bin app --release -- -t| findstr LOGGER
+    Finished release [optimized] target(s) in 0.03s #release模式下已经找不到符号LOGGER
+
+cargo objdump --bin app -- -t| findstr LOGGER
+    Finished dev [unoptimized + debuginfo] target(s) in 0.03s
+00000730 g     O .rodata        00000008 LOGGER
+```
 
 
 
@@ -804,11 +1836,6 @@ Program Headers:
 
 
 
-# 使用旧式方法写汇编
+# 【8】DMA
 
-# 使用符号进行日志输出
-
-# 全局的单例对象
-
-# DMA
-
+第八章对实现DMA做了介绍并给出一些代码，但没有可供实际运行的例子，因此这个章节暂时先放一放，日后如果有能力在此基础上实现一个可以运行的DMA时候再回来补充笔记
