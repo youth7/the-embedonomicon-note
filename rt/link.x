@@ -45,9 +45,14 @@ SECTIONS
     _ebss = .;/* 将.bss的结束地址保存到_ebss中 */
   } > RAM
 
-  .data : AT(ADDR(.rodata) + SIZEOF(.rodata))  /*指定.data的LMA，紧贴着.rodata*/
+/*
+用AT命令指定.data的LMA，让这个段紧贴着.rodata段，但这里并没有指定VMA
+这里非常重要，理解AT命令请看这里的例子：https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html#SEC16
+务必理解这里通过什么样的方式指定了.data的VMA和LMA（链接脚本并没有指定VMA）
+*/
+  .data : AT(ADDR(.rodata) + SIZEOF(.rodata))  
   {
-    _sdata = .;/* 将.data的起始地址保存到_sdata中 */
+    _sdata = .;/* 将.data的起始地址保存到_sdata中,注意：这里相当于保存了该节的VMA！ */
     *(.data .data.*);
     _edata = .;/* 将.data的结束地址保存到_edata中 */
   } > RAM

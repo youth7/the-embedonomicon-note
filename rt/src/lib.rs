@@ -11,7 +11,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 #[no_mangle]
 pub unsafe extern "C" fn Reset() -> ! {
 
-    // 为何这里需要extern块修饰呢？
+    // 为何这里需要extern块修饰呢？因为这些符号都是由链接脚本直接定义的，需要直接从ELF文件中读取。
     extern "C" {
         static mut _sbss: u8;
         static mut _ebss: u8;
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn Reset() -> ! {
 //告诉编译器不要用Rust的命名规则为Reset重命名，保留原来的名称就好
 #[no_mangle]
 //RESET_VECTOR就是vector table中的第二个元素，指向了异常处理函数Reset
-//不太明白为何要多用一个变量RESET_VECTOR而不是直接使用Reset函数，后来发现Reset函数是被编译到.text节中的，
+//不太明白为何要多用一个变量RESET_VECTOR而不是直接使用Reset函数
 pub static RESET_VECTOR: unsafe extern "C" fn() -> ! = Reset;
 
 
