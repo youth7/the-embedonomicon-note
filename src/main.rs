@@ -2,9 +2,9 @@
 #![no_std]
 
 use core::panic::PanicInfo;
-
 #[panic_handler]//自定义程序奔溃时的行为，因为缺乏运行时的原因这个必须自己定义
-fn panic(_panic: &PanicInfo<'_>) -> ! {
+fn hello_panic(_panic: &PanicInfo<'_>) -> ! {
+    let _y = 64;
     loop {}
 }
 
@@ -12,6 +12,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 pub unsafe extern "C" fn Reset() -> ! {
     let _x = 42;
     //永不退出的发散函数
+    panic!("oh, system crash!");//让程序主动panic，则上面自定义的hello_panic会被调用
     loop {}
 }
 //说明这个函数需要编译到名称为.vector_table.reset_vector的这个节中，这个节在后面会被引用到
